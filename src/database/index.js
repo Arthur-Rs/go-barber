@@ -3,8 +3,9 @@ import Settings from '../settings/database';
 
 // Models
 import UserModel from '../app/models/UserModel';
+import FileModel from '../app/models/FileModel';
 
-const models = [UserModel];
+const models = [UserModel, FileModel];
 
 class Database {
   constructor() {
@@ -14,7 +15,11 @@ class Database {
   init() {
     this.connection = new Sequelize(Settings);
 
-    models.map((model) => model.init(this.connection));
+    models
+      .map((model) => model.init(this.connection))
+      .map(
+        (model) => model.associete && model.associete(this.connection.models)
+      );
   }
 }
 

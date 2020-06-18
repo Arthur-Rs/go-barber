@@ -25,6 +25,10 @@ class User extends Model {
     return this;
   }
 
+  static associete(models) {
+    this.belongsTo(models.File, { foreignKey: 'avatar_id', as: 'avatar' });
+  }
+
   ComparePassword(password) {
     return compare(password, this.password_hash);
   }
