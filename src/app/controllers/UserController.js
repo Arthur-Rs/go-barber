@@ -34,22 +34,25 @@ class UseController {
       name: Yup.string().min(3).max(32),
       email: Yup.string().email().max(64),
       oldPassword: Yup.string().min(6).max(32),
+      avatar_id: Yup.number().positive(),
       password: Yup.string()
         .min(6)
-        .when('oldPassword', (oldPassword, field ) =>
-          oldPassword ? field.required() : field ),
+        .when('oldPassword', (oldPassword, field) =>
+          oldPassword ? field.required() : field
+        ),
       confirmPassword: Yup.string().when('password', (password, field) =>
         password ? field.required().oneOf([Yup.ref('password')]) : field
       ),
     });
 
     if (!(await schema.isValid(req.body))) {
-      return res.status(401).json('Icomplete body!');
+      return res.status(401).json({ status: 'Icomplete body!' });
     }
 
     // ========================== \\
 
-    const { oldPassword } = req.body;
+    const data = req.body;
+    const { oldPassword } = data;
     const { userId } = req;
 
     const User = await UserModel.findByPk(userId);
@@ -58,8 +61,8 @@ class UseController {
       return res.status(401).json('Icorrect Password!');
     }
 
-    await User.update(req.body).catch(() => {
-      return res.status(500).json({ status: 'Error in database!' });
+    await User.update(data).catch(() => {
+      return res.status(500).json({ status: 'Error in database! 1' });
     });
 
     return res.json({ status: 'Successful Change!' });
