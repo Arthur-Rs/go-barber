@@ -1,8 +1,15 @@
 import * as Yup from 'yup';
-import { startOfHour, parseISO, isBefore } from 'date-fns';
+
+import { startOfHour, parseISO, isBefore, format, subHours } from 'date-fns';
+import locale from 'date-fns/locale/pt-BR';
+
 import AppointmentsModel from '../models/AppointmentsModel';
 import UserModel from '../models/UserModel';
 import FileModel from '../models/FileModel';
+
+import Notification from '../schemas/Notification';
+
+import Email from '../../lib/mail';
 
 class AppointmentsController {
   async index(req, res) {
@@ -40,6 +47,7 @@ class AppointmentsController {
   }
 
   async store(req, res) {
+    // ==== Validation ==== \\
     const schema = Yup.object().shape({
       date: Yup.date().required(),
       provider_id: Yup.number().positive().required(),
@@ -73,6 +81,30 @@ class AppointmentsController {
       return res.status(400).json({ status: 'Full Date' });
     }
 
+    if (provider_id === req.userId) {
+      return res.status(400).json({ status: 'Invalid Provider' });
+    }
+
+    // ==== Send Notification for Provider ==== \\
+
+    const { userId } = req;
+
+    const UserData = await UserModel.findByPk(userId).catch(() => {
+      return res.status(500).json({ status: 'Error in database!' });
+    });
+
+    const { name } = UserData;
+
+    const formattedDate = format(hourStart, "dd 'de' MMMM', ás' H:mm'h.'", {
+      locale,
+    });
+
+    await Notification.create({
+      content: `${name}, fez um agendamento para o dia ${formattedDate}`,
+      user: provider_id,
+    });
+
+    // ==== Add in Database ==== \\
     const data = {
       date: hourStart,
       provider_id,
@@ -84,6 +116,55 @@ class AppointmentsController {
     });
 
     return res.json({ status: 'Success!' });
+  }
+
+  async delete(req, res) {
+    const appoint = await AppointmentsModel.findByPk(req.params.id, {
+      include: [
+        {
+          model: UserModel,
+          as: 'provider',
+          attributes: ['id', 'name', 'email'],
+        },
+        {
+          model: UserModel,
+          as: 'user',
+          attributes: ['id', 'name', 'email'],
+        },
+      ],
+    }).catch(() => {
+      return res.status(500).json({ status: 'Error in database!' });
+    });
+
+    if (req.userId !== appoint.user_id) {
+      return res.status(400).json({ status: "You Don't Have Permission!" });
+    }
+
+    const dateLimit = subHours(appoint.date, 2);
+
+    if (isBefore(dateLimit, new Date())) {
+      return res.status(400).json({ status: 'You can only cancel' });
+    }
+
+    appoint.canceled_at = new Date();
+
+    await appoint.save();
+
+    const { email, name } = appoint.provider;
+
+    await Email.sendMail({
+      to: `${name} <${email}>`,
+      subject: 'Cancelamento de Agendamento',
+      template: 'cancellation',
+      context: {
+        provider: name,
+        user: appoint.user.name,
+        date: '25/25/25',
+        hour: 'getHours(appoint.date)',
+      },
+    });
+
+    return res.json(appoint);
   }
 }
 

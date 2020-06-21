@@ -1,13 +1,13 @@
 import Mongoose from 'mongoose';
 
-const Notification = Mongoose.Schema(
+const Notification = new Mongoose.Schema(
   {
     content: {
       type: String,
       required: true,
     },
     user: {
-      type: String,
+      type: Number,
       required: true,
     },
     read: {
@@ -21,4 +21,4 @@ const Notification = Mongoose.Schema(
   }
 );
 
-export default Notification;
+export default Mongoose.model('Notification', Notification);
