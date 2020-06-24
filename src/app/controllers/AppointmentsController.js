@@ -9,7 +9,8 @@ import FileModel from '../models/FileModel';
 
 import Notification from '../schemas/Notification';
 
-import Email from '../../lib/mail';
+import CancellationEmail from '../jobs/CancellationEmail';
+import Queue from '../../lib/queue';
 
 class AppointmentsController {
   async index(req, res) {
@@ -146,25 +147,17 @@ class AppointmentsController {
       return res.status(400).json({ status: 'You can only cancel' });
     }
 
+    if (appoint.canceled_at !== null) {
+      return res.status(400).json({ status: 'You can only cancel' });
+    }
+
     appoint.canceled_at = new Date();
+
+    await Queue.Add(CancellationEmail.key, { appoint });
 
     await appoint.save();
 
-    const { email, name } = appoint.provider;
-
-    await Email.sendMail({
-      to: `${name} <${email}>`,
-      subject: 'Cancelamento de Agendamento',
-      template: 'cancellation',
-      context: {
-        provider: name,
-        user: appoint.user.name,
-        date: '25/25/25',
-        hour: 'getHours(appoint.date)',
-      },
-    });
-
-    return res.json(appoint);
+    return res.json({ status: 'Appointment canceled with success!' });
   }
 }
 
